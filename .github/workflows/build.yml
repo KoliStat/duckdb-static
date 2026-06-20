@@ -33,7 +33,15 @@ env:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # Pinned to windows-2022 (VS 2022 / MSVC 14.4x) on purpose. DuckDB v1.5.1's
+    # bundled `fmt` uses `stdext::checked_array_iterator`, an MSVC STL extension
+    # that the VS "18" toolset (MSVC 14.51, now on windows-latest) REMOVED — the
+    # build dies in third_party/fmt/format.h. DuckDB already passes
+    # `_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS`, i.e. it expects that symbol to
+    # be present-but-deprecated, which holds on 14.4x but not 14.51. Bump this
+    # only once the pinned duckdb_ref ships an fmt that compiles on the newer
+    # toolset.
+    runs-on: windows-2022
     steps:
       - name: Checkout duckdb
         uses: actions/checkout@v4
