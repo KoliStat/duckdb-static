@@ -3,3 +3,6 @@ duckdb/
 build/
 duckdb-static-*/
 *.zip
+
+# Local artifact-verification scratch (downloaded release zip + extracted libs).
+_verify/

@@ -29,7 +29,13 @@ permissions:
 
 env:
   DUCKDB_REF: ${{ github.event.inputs.duckdb_ref || 'v1.5.1' }}
-  CORE_EXTENSIONS: "parquet;json"
+  # Extensions to statically link INTO the duckdb static lib. The CMake cache
+  # variable is BUILD_EXTENSIONS — DuckDB's Makefile only *maps* its
+  # CORE_EXTENSIONS convenience var onto -DBUILD_EXTENSIONS. Passing
+  # -DCORE_EXTENSIONS to cmake directly is silently ignored (CMake doesn't error
+  # on unknown -D vars), which yields a green but core-only lib with no
+  # parquet/json. Must be paired with -DEXTENSION_STATIC_BUILD=1 below.
+  BUILD_EXTENSIONS: "parquet;json"
 
 jobs:
   build:
@@ -71,11 +77,18 @@ jobs:
           -DCMAKE_CXX_STANDARD_REQUIRED=ON
           -DBUILD_UNITTESTS=OFF
           -DBUILD_SHELL=OFF
-          -DCORE_EXTENSIONS="${{ env.CORE_EXTENSIONS }}"
+          -DEXTENSION_STATIC_BUILD=1
+          -DBUILD_EXTENSIONS="${{ env.BUILD_EXTENSIONS }}"
 
-      - name: Build static library
+      - name: Build static lib + parquet/json extension libs
         working-directory: duckdb
-        run: cmake --build build --target duckdb_static
+        # duckdb_static does NOT absorb the extensions: in src/CMakeLists.txt
+        # link_extension_libraries() is attached only to the shared `duckdb`
+        # target, not duckdb_static. The extensions build as their own static
+        # libs (`<name>_extension`, e.g. build_static_extension(parquet ...) ->
+        # parquet_extension) which the consumer links alongside duckdb_static.
+        # Build them explicitly — `--target duckdb_static` alone would skip them.
+        run: cmake --build build --target duckdb_static parquet_extension json_extension
 
       - name: Stage lib + headers
         shell: pwsh
