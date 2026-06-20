@@ -1,0 +1,5 @@
+# CI build inputs/outputs — never committed (produced by the workflow).
+duckdb/
+build/
+duckdb-static-*/
+*.zip

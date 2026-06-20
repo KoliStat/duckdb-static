@@ -1,0 +1,100 @@
+name: Build static DuckDB (Windows)
+
+# Builds DuckDB from source as a STATIC library for windows-x64 (MSVC), with
+# the parquet + json extensions linked in, and (optionally) publishes it as a
+# GitHub Release. Consumed by KoliStat projects (bedevere-desktop, …) that want
+# to link DuckDB statically instead of shipping duckdb.dll.
+#
+# Built straight from DuckDB's own CMake — NOT the conan recipe, which breaks
+# the parquet extension on MSVC.
+#
+# Status: bring-up. The exact CMake flags (CORE_EXTENSIONS, the static target
+# name, the produced .lib / header layout) are being validated against DuckDB
+# v1.5.1 and will evolve over the first runs. DuckDB is a large C++ codebase —
+# the compile takes a while.
+
+on:
+  workflow_dispatch:
+    inputs:
+      duckdb_ref:
+        description: "duckdb/duckdb tag to build (matches stats_duck ABI + bedevere-desktop)"
+        default: "v1.5.1"
+      do_release:
+        description: "Publish a GitHub Release with the artifact"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  DUCKDB_REF: ${{ github.event.inputs.duckdb_ref || 'v1.5.1' }}
+  CORE_EXTENSIONS: "parquet;json"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout duckdb
+        uses: actions/checkout@v4
+        with:
+          repository: duckdb/duckdb
+          ref: ${{ env.DUCKDB_REF }}
+          path: duckdb
+          fetch-depth: 1
+
+      - name: Set up Python + ninja
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ninja
+
+      - name: Set up MSVC (x64)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure (static, Release, parquet + json)
+        working-directory: duckdb
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_UNITTESTS=OFF
+          -DBUILD_SHELL=OFF
+          -DCORE_EXTENSIONS="${{ env.CORE_EXTENSIONS }}"
+
+      - name: Build static library
+        working-directory: duckdb
+        run: cmake --build build --target duckdb_static
+
+      - name: Stage lib + headers
+        shell: pwsh
+        run: |
+          $out = "duckdb-static-${{ env.DUCKDB_REF }}-windows-x64"
+          New-Item -ItemType Directory -Force -Path "$out/lib","$out/include" | Out-Null
+          # All static libs the build produced (duckdb core + any linked
+          # extensions). Logged so the first run reveals the real layout.
+          $libs = Get-ChildItem duckdb/build -Recurse -Filter *.lib
+          "Found $($libs.Count) .lib file(s):"; $libs | ForEach-Object { $_.FullName }
+          $libs | Copy-Item -Destination "$out/lib" -Force
+          # DuckDB C++ public headers (may switch to the single-file
+          # amalgamation header once the build is settled).
+          Copy-Item -Recurse "duckdb/src/include/*" "$out/include" -Force
+          Compress-Archive -Path "$out/lib", "$out/include" -DestinationPath "$out.zip" -Force
+          "ARTIFACT=$out.zip" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: duckdb-static-windows-x64
+          path: ${{ env.ARTIFACT }}
+          if-no-files-found: error
+
+      - name: Publish release
+        if: ${{ github.event.inputs.do_release == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.DUCKDB_REF }}-win-x64
+          name: DuckDB ${{ env.DUCKDB_REF }} static (windows-x64, parquet+json)
+          files: ${{ env.ARTIFACT }}
+          fail_on_unmatched_files: true
