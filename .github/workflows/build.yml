@@ -86,7 +86,11 @@ jobs:
         # so build (and ship) them as their own static libs:
         #  - <name>_extension (build_static_extension(parquet ...) ->
         #    parquet_extension); src/CMakeLists.txt links these only into the
-        #    shared `duckdb` target, not duckdb_static.
+        #    shared `duckdb` target, not duckdb_static. The generated loader
+        #    static-loads THREE here: core_functions (a built-in core extension
+        #    linked regardless of BUILD_EXTENSIONS) + parquet + json — so the
+        #    core_functions_extension lib must be built/shipped too, else the
+        #    loader fails with `unresolved external CoreFunctionsExtension::Load`.
         #  - duckdb_generated_extension_loader: defines ExtensionHelper::
         #    LoadAllExtensions, which the DuckDB ctor calls to static-load the
         #    linked extensions. It's GENERATED (configure_file) and appended to
@@ -94,7 +98,7 @@ jobs:
         #    so it never lands in duckdb_static.lib — a host that links only
         #    duckdb_static.lib fails with `unresolved external LoadAllExtensions`.
         # Build them all explicitly; the consumer links the lot.
-        run: cmake --build build --target duckdb_static duckdb_generated_extension_loader parquet_extension json_extension
+        run: cmake --build build --target duckdb_static duckdb_generated_extension_loader core_functions_extension parquet_extension json_extension
 
       - name: Stage lib + headers
         shell: pwsh
