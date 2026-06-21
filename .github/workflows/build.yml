@@ -80,15 +80,21 @@ jobs:
           -DEXTENSION_STATIC_BUILD=1
           -DBUILD_EXTENSIONS="${{ env.BUILD_EXTENSIONS }}"
 
-      - name: Build static lib + parquet/json extension libs
+      - name: Build static lib + extension libs + generated loader
         working-directory: duckdb
-        # duckdb_static does NOT absorb the extensions: in src/CMakeLists.txt
-        # link_extension_libraries() is attached only to the shared `duckdb`
-        # target, not duckdb_static. The extensions build as their own static
-        # libs (`<name>_extension`, e.g. build_static_extension(parquet ...) ->
-        # parquet_extension) which the consumer links alongside duckdb_static.
-        # Build them explicitly — `--target duckdb_static` alone would skip them.
-        run: cmake --build build --target duckdb_static parquet_extension json_extension
+        # duckdb_static absorbs neither the extensions nor the extension loader,
+        # so build (and ship) them as their own static libs:
+        #  - <name>_extension (build_static_extension(parquet ...) ->
+        #    parquet_extension); src/CMakeLists.txt links these only into the
+        #    shared `duckdb` target, not duckdb_static.
+        #  - duckdb_generated_extension_loader: defines ExtensionHelper::
+        #    LoadAllExtensions, which the DuckDB ctor calls to static-load the
+        #    linked extensions. It's GENERATED (configure_file) and appended to
+        #    the ROOT-scope object list AFTER duckdb_static is defined in src/,
+        #    so it never lands in duckdb_static.lib — a host that links only
+        #    duckdb_static.lib fails with `unresolved external LoadAllExtensions`.
+        # Build them all explicitly; the consumer links the lot.
+        run: cmake --build build --target duckdb_static duckdb_generated_extension_loader parquet_extension json_extension
 
       - name: Stage lib + headers
         shell: pwsh
