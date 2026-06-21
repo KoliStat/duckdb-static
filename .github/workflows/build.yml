@@ -103,6 +103,12 @@ jobs:
           # DuckDB C++ public headers (may switch to the single-file
           # amalgamation header once the build is settled).
           Copy-Item -Recurse "duckdb/src/include/*" "$out/include" -Force
+          # Extension headers for the statically-linked extensions. They live
+          # in each extension's own include/ dir (NOT src/include), and a
+          # consumer needs them to `#include "parquet_extension.hpp"` /
+          # "json_extension.hpp" and register via DuckDB::LoadStaticExtension<T>().
+          Copy-Item -Recurse "duckdb/extension/parquet/include/*" "$out/include" -Force
+          Copy-Item -Recurse "duckdb/extension/json/include/*" "$out/include" -Force
           Compress-Archive -Path "$out/lib", "$out/include" -DestinationPath "$out.zip" -Force
           "ARTIFACT=$out.zip" | Out-File -FilePath $env:GITHUB_ENV -Append
 
