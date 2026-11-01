@@ -27,11 +27,11 @@ Each GitHub Release (tag `v<X.Y.Z>-win-x64`) carries
 
 **Actions → "Build static DuckDB (Windows)" → Run workflow:**
 
-- `duckdb_ref` — the `duckdb/duckdb` tag. Default **`v1.5.1`**, pinned to
+- `duckdb_ref` — the `duckdb/duckdb` tag. Default **`v1.5.6`**, pinned to
   match stats_duck's ABI and bedevere-desktop's DuckDB. Bump in lockstep.
 - `do_release` — check to publish a GitHub Release with the artifact.
 
-The build compiles DuckDB from source (large codebase — expect a long run).
+The build compiles DuckDB from source. A run takes about 15 minutes.
 
 ### Build constraints (learned the hard way)
 
@@ -39,6 +39,7 @@ The build compiles DuckDB from source (large codebase — expect a long run).
   `fmt` uses `stdext::checked_array_iterator`, an MSVC STL extension that the
   VS "18" toolset (MSVC 14.51, now on `windows-latest`) removed. Bump only once
   the pinned `duckdb_ref` ships an `fmt` that compiles on the newer toolset.
+  The v1.5.6 release was also built on `windows-2022`.
 - **Extensions are enabled with `-DBUILD_EXTENSIONS`** — the actual CMake cache
   variable. `CORE_EXTENSIONS` is only a *Makefile* alias that maps onto it;
   passing `-DCORE_EXTENSIONS` to `cmake` directly is silently ignored and
@@ -67,3 +68,5 @@ target_compile_definitions(duckdb_static INTERFACE DUCKDB_STATIC_BUILD)
 > **Status: validated.** First green release is **`v1.5.1-win-x64`** — parquet
 > and json linkage confirmed via `dumpbin` on the artifact (ParquetReader /
 > ColumnReader / thrift / snappy and JSONCommon / JSONReader symbols present).
+> The current release is **`v1.5.6-win-x64`** (2026-11-01). bedevere desktop
+> links it from version 0.16 on.
