@@ -8,17 +8,15 @@ name: Build static DuckDB (Windows)
 # Built straight from DuckDB's own CMake — NOT the conan recipe, which breaks
 # the parquet extension on MSVC.
 #
-# Status: bring-up. The exact CMake flags (CORE_EXTENSIONS, the static target
-# name, the produced .lib / header layout) are being validated against DuckDB
-# v1.5.1 and will evolve over the first runs. DuckDB is a large C++ codebase —
-# the compile takes a while.
+# Releases so far: v1.5.1-win-x64 (2026-06) and v1.5.6-win-x64 (2026-11-01).
+# A run compiles DuckDB from source and takes about 15 minutes.
 
 on:
   workflow_dispatch:
     inputs:
       duckdb_ref:
         description: "duckdb/duckdb tag to build (matches stats_duck ABI + bedevere-desktop)"
-        default: "v1.5.1"
+        default: "v1.5.6"
       do_release:
         description: "Publish a GitHub Release with the artifact"
         type: boolean
@@ -28,7 +26,7 @@ permissions:
   contents: write
 
 env:
-  DUCKDB_REF: ${{ github.event.inputs.duckdb_ref || 'v1.5.1' }}
+  DUCKDB_REF: ${{ github.event.inputs.duckdb_ref || 'v1.5.6' }}
   # Extensions to statically link INTO the duckdb static lib. The CMake cache
   # variable is BUILD_EXTENSIONS — DuckDB's Makefile only *maps* its
   # CORE_EXTENSIONS convenience var onto -DBUILD_EXTENSIONS. Passing
